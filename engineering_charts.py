@@ -7,7 +7,7 @@ from typing import Iterable
 
 import matplotlib
 matplotlib.use("Agg")
-import matplotlib.pyplot import as plt
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from openpyxl import load_workbook
@@ -32,7 +32,7 @@ def _measurement_values(data: pd.DataFrame, columns: Iterable[str]) -> np.ndarra
     columns = list(columns)
     if not columns:
         raise ValueError("Select at least one measurement column.")
-    missing = [c for c in columns if c not in data.columns]
+    missing = [column for column in columns if column not in data.columns]
     if missing:
         raise ValueError("Measurement column(s) not found: " + ", ".join(missing))
     numeric = data[columns].apply(pd.to_numeric, errors="coerce")
@@ -46,12 +46,13 @@ def _capability(values: np.ndarray, usl=None, lsl=None) -> dict:
     mean = float(np.mean(finite)) if count else np.nan
     std = float(np.std(finite, ddof=1)) if count > 1 else np.nan
 
-    # Moving-range estimate of within-subgroup variation for Cp/Cpk.
     within = np.nan
     if count > 1:
         differences = np.diff(finite)
-        if differences.size:
-            within = float(np.std(differences, ddof=1) / np.sqrt(2)) if differences.size > 1 else float(abs(differences[0]) / np.sqrt(2))
+        if differences.size > 1:
+            within = float(np.std(differences, ddof=1) / np.sqrt(2))
+        elif differences.size == 1:
+            within = float(abs(differences[0]) / np.sqrt(2))
 
     above = int(np.sum(finite > usl)) if usl is not None else 0
     below = int(np.sum(finite < lsl)) if lsl is not None else 0
@@ -73,10 +74,12 @@ def _capability(values: np.ndarray, usl=None, lsl=None) -> dict:
         spec_width = float(usl - lsl)
         if np.isfinite(within) and within > 0:
             cp = spec_width / (6 * within)
-            cpk = min((usl - mean) / (3 * within), (mean - lsl) / (3 * within))
+            cpk = min((usl - mean) / (3 * within),
+                      (mean - lsl) / (3 * within))
         if np.isfinite(std) and std > 0:
             pp = spec_width / (6 * std)
-            ppk = min((usl - mean) / (3 * std), (mean - lsl) / (3 * std))
+            ppk = min((usl - mean) / (3 * std),
+                      (mean - lsl) / (3 * std))
 
     if count:
         q1, q3 = np.percentile(finite, [25, 75])
@@ -141,7 +144,6 @@ def vendor_summary(data: pd.DataFrame, columns: Iterable[str],
             "Yield %": stats["Yield %"],
             "Out-of-spec Count": stats["Fail"],
         })
-
     result = pd.DataFrame(records)
     if not result.empty:
         result = result.sort_values(
@@ -217,7 +219,8 @@ def render_chart(data: pd.DataFrame, columns: Iterable[str], chart_type: str,
             ax.plot(np.arange(len(columns)), row.to_numpy(dtype=float), color=color,
                     alpha=alpha, linewidth=1.6 if is_fail else 0.65)
         ax.set_xticks(np.arange(len(columns)), columns, rotation=45, ha="right")
-        ax.set_xlabel("Measurement point"); ax.set_ylabel("Measurement value")
+        ax.set_xlabel("Measurement point")
+        ax.set_ylabel("Measurement value")
 
     elif chart_type in ("Vendor Comparison Chart", "Average Trend Chart"):
         if chart_type == "Vendor Comparison Chart" and group_column in data.columns:
@@ -227,7 +230,8 @@ def render_chart(data: pd.DataFrame, columns: Iterable[str], chart_type: str,
         else:
             ax.plot(columns, values.mean(axis=0), marker="o", color="#2878b5", label="Mean")
             ax.legend()
-        ax.set_ylabel("Measurement value"); ax.tick_params(axis="x", rotation=45)
+        ax.set_ylabel("Measurement value")
+        ax.tick_params(axis="x", rotation=45)
 
     elif chart_type == "Box Plot by Vendor":
         if group_column not in data.columns:
@@ -236,18 +240,21 @@ def render_chart(data: pd.DataFrame, columns: Iterable[str], chart_type: str,
         vendors = long["__group"].astype(str).unique().tolist()[:40]
         groups = [long.loc[long["__group"].eq(vendor), "Value"].to_numpy() for vendor in vendors]
         ax.boxplot(groups, tick_labels=vendors, showfliers=False)
-        ax.set_ylabel("Measurement value"); ax.tick_params(axis="x", rotation=45)
+        ax.set_ylabel("Measurement value")
+        ax.tick_params(axis="x", rotation=45)
 
     elif chart_type == "Histogram":
         ax.hist(values.to_numpy().ravel(), bins="fd", color="#4472c4", alpha=.8)
-        ax.set_xlabel("Measurement value"); ax.set_ylabel("Frequency")
+        ax.set_xlabel("Measurement value")
+        ax.set_ylabel("Frequency")
 
     elif chart_type == "Scatter Plot":
         if len(columns) < 2:
             raise ValueError("Select at least two measurement columns for scatter plot.")
         ax.scatter(values.iloc[:, 0], values.iloc[:, 1], s=10, alpha=.5,
                    c=np.where(failed, "#d62728", "#4472c4"))
-        ax.set_xlabel(columns[0]); ax.set_ylabel(columns[1])
+        ax.set_xlabel(columns[0])
+        ax.set_ylabel(columns[1])
 
     elif chart_type == "Control/SPC Chart":
         series = values.iloc[:, 0].to_numpy(dtype=float)
@@ -263,7 +270,9 @@ def render_chart(data: pd.DataFrame, columns: Iterable[str], chart_type: str,
         if np.isfinite(sigma):
             ax.axhline(mean + 3 * sigma, color="#d62728", linestyle="--", label="UCL (3σ)")
             ax.axhline(mean - 3 * sigma, color="#d62728", linestyle="--", label="LCL (3σ)")
-        ax.set_xlabel("Unit / row"); ax.set_ylabel(columns[0]); ax.legend()
+        ax.set_xlabel("Unit / row")
+        ax.set_ylabel(columns[0])
+        ax.legend()
 
     else:
         raise ValueError(f"Unsupported chart type: {chart_type}")

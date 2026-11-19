@@ -1,6 +1,14 @@
+from __future__ import annotations
+
 import py_compile
 
-py_compile.compile("engineering_chart_analyzer.py", doraise=True)
-py_compile.compile("engineering_charts.py", doraise=True)
-py_compile.compile("engine.py", doraise=True)
+FILES = (
+    "engine.py",
+    "engineering_charts.py",
+    "engineering_chart_analyzer.py",
+)
+
+for file_name in FILES:
+    py_compile.compile(file_name, doraise=True)
+
 print("Python syntax OK")
